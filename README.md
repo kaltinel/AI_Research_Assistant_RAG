@@ -46,6 +46,12 @@ This provides a user-friendly browser interface that combines both document uplo
 
 **Think of this as**: A complete web application that makes the system accessible to anyone through their browser.
 
+![Drag and Drop Interface](drag_drop.png)
+*Drag and drop interface for easy document upload*
+
+![Chat Interface](chat.png)
+*Interactive chat interface for asking questions about your documents*
+
 ### 4. Supporting Documentation
 
 - `README_MAC_SETUP.md`: Complete setup instructions for macOS
