@@ -160,32 +160,11 @@ python3 query_documents.py --interactive
 
 This starts a chat interface where you can ask follow-up questions and explore your documents naturally.
 
-## Understanding the Technology
-
-### What is RAG (Retrieval-Augmented Generation)?
-
-RAG is a method that combines document search with AI text generation. Instead of the AI making up answers, it:
-
-1. **Retrieval**: Finds relevant sections from your actual documents
-2. **Augmentation**: Combines those sections with your question  
-3. **Generation**: Uses AI to synthesize a comprehensive answer
-
-This means you get answers that are grounded in your specific documents, not general knowledge.
-
-### Why Use Vector Embeddings?
-
-Traditional search looks for exact word matches. Vector embeddings understand meaning and context. For example:
-- Traditional search: "car" won't find "automobile" or "vehicle"
-- Vector search: Understands these words are related and finds relevant content
-
-This makes the system much better at understanding what you're really asking about.
-
 ## File Structure
 
-After setting up, your directory will look like this:
-
+A well-set up directory will look like this:
 ```
-llm-embed/
+ai_research_assistant_rag/
 ├── upload_and_embed_pdf.py    # Script to process PDF documents
 ├── query_documents.py         # Script to ask questions
 ├── web_app.py                 # Web interface application
