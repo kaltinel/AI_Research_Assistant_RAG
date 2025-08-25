@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+
+{% block title %}Chat - LLM-Embed RAG System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-container {
+        height: 600px;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 20px;
+        background: white;
+        margin-bottom: 20px;
+    }
+
+    .message {
+        margin-bottom: 20px;
+        padding: 15px;
+        border-radius: 10px;
+        max-width: 80%;
+    }
+
+    .message-user {
+        background: linear-gradient(135deg, var(--secondary-color), #5dade2);
+        color: white;
+        margin-left: auto;
+        border-bottom-right-radius: 5px;
+    }
+
+    .message-ai {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        margin-right: auto;
+        border-bottom-left-radius: 5px;
+    }
+
+    .message-header {
+        font-weight: 600;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+    }
+
+    .message-content {
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    .message-sources {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #e9ecef;
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+
+    .query-input {
+        border-radius: 25px;
+        border: 2px solid #e9ecef;
+        padding: 12px 20px;
+        transition: all 0.3s ease;
+    }
+
+    .query-input:focus {
+        border-color: var(--secondary-color);
+        box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+    }
+
+    .send-btn {
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 10px;
+    }
+
+    .typing-indicator {
+        display: none;
+        padding: 15px;
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        max-width: 80%;
+        border-bottom-left-radius: 5px;
+    }
+
+    .typing-dots {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .typing-dots span {
+        height: 8px;
+        width: 8px;
+        background-color: #6c757d;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+        animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+        0%, 80%, 100% {
+            transform: scale(0);
+        } 40% {
+            transform: scale(1);
+        }
+    }
+
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .welcome-message {
+        text-align: center;
+        color: #6c757d;
+        padding: 40px 20px;
+    }
+
+    .example-queries {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .example-query {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 10px 15px;
+        margin: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-block;
+    }
+
+    .example-query:hover {
+        background: var(--secondary-color);
+        color: white;
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <!-- Chat Interface -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-comments me-2"></i>Document Q&A Chat
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <!-- Chat Messages -->
+                <div id="chatContainer" class="chat-container">
+                    <div class="welcome-message" id="welcomeMessage">
+                        <h5>Welcome to your AI Research Assistant!</h5>
+                        <p>Ask questions about your uploaded documents and get AI-powered answers based on their content.</p>
+                        
+                        {% if doc_count > 0 %}
+                        <div class="example-queries">
+                            <h6>Try asking:</h6>
+                            <span class="example-query" onclick="setQuery('What is the main topic discussed?')">What is the main topic discussed?</span>
+                            <span class="example-query" onclick="setQuery('What are the main methods used in the document?')">What are the main methods used?</span>
+                            <span class="example-query" onclick="setQuery('What are the key requirements to conduct this research?')">What are the key requirements?</span>
+                            <span class="example-query" onclick="setQuery('Can you summarize the main findings?')">Can you summarize the main findings?</span>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            No documents found. Please <a href="{{ url_for('upload_page') }}">upload some PDF documents</a> first.
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Typing indicator -->
+                    <div id="typingIndicator" class="typing-indicator">
+                        <div class="typing-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                        <span class="ms-2">AI is thinking...</span>
+                    </div>
+                </div>
+                
+                <!-- Input Area -->
+                <div class="p-3 border-top">
+                    <div class="d-flex">
+                        <input type="text" id="queryInput" class="form-control query-input" 
+                               placeholder="Ask a question about your documents..." 
+                               {% if doc_count == 0 %}disabled{% endif %}>
+                        <button id="sendBtn" class="btn btn-primary send-btn" 
+                                {% if doc_count == 0 %}disabled{% endif %}>
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Document Statistics -->
+        <div class="stats-card">
+            <h6><i class="fas fa-chart-bar me-2"></i>Document Statistics</h6>
+            <div class="row text-center mt-3">
+                <div class="col-6">
+                    <div class="h3 mb-0">{{ doc_count }}</div>
+                    <small>Documents</small>
+                </div>
+                <div class="col-6">
+                    <div class="h3 mb-0" id="chatCount">0</div>
+                    <small>Questions Asked</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-bolt me-2"></i>Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('upload_page') }}" class="btn btn-outline-primary w-100 mb-2">
+                    <i class="fas fa-upload me-2"></i>Upload New Document
+                </a>
+                <button class="btn btn-outline-secondary w-100" onclick="clearChat()">
+                    <i class="fas fa-trash me-2"></i>Clear Chat History
+                </button>
+            </div>
+        </div>
+        
+        <!-- System Status -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-server me-2"></i>System Status</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>Ollama Model:</span>
+                    <span class="status-badge status-success">qwen3:0.6b</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>Vector Database:</span>
+                    <span class="status-badge {% if doc_count > 0 %}status-success{% else %}status-warning{% endif %}">
+                        {% if doc_count > 0 %}Ready{% else %}Empty{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let chatCount = 0;
+
+// Handle query submission
+document.getElementById('queryInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendQuery();
+    }
+});
+
+document.getElementById('sendBtn').addEventListener('click', sendQuery);
+
+function setQuery(query) {
+    document.getElementById('queryInput').value = query;
+    document.getElementById('queryInput').focus();
+}
+
+function sendQuery() {
+    const input = document.getElementById('queryInput');
+    const query = input.value.trim();
+    
+    if (!query) return;
+    
+    // Hide welcome message
+    const welcomeMsg = document.getElementById('welcomeMessage');
+    if (welcomeMsg) {
+        welcomeMsg.style.display = 'none';
+    }
+    
+    // Add user message
+    addMessage('user', query);
+    
+    // Clear input and show typing indicator
+    input.value = '';
+    showTypingIndicator();
+    
+    // Disable input while processing
+    input.disabled = true;
+    document.getElementById('sendBtn').disabled = true;
+    
+    // Send query to backend
+    fetch('/api/query', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: query })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideTypingIndicator();
+        
+        if (data.error) {
+            addMessage('ai', 'Sorry, I encountered an error: ' + data.error, []);
+        } else {
+            addMessage('ai', data.response, data.sources);
+            chatCount++;
+            document.getElementById('chatCount').textContent = chatCount;
+        }
+    })
+    .catch(error => {
+        hideTypingIndicator();
+        addMessage('ai', 'Sorry, I encountered an error while processing your request.', []);
+    })
+    .finally(() => {
+        // Re-enable input
+        input.disabled = false;
+        document.getElementById('sendBtn').disabled = false;
+        input.focus();
+    });
+}
+
+function addMessage(type, content, sources = []) {
+    const chatContainer = document.getElementById('chatContainer');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message message-${type}`;
+    
+    let sourcesHtml = '';
+    if (sources && sources.length > 0) {
+        sourcesHtml = `
+            <div class="message-sources">
+                <i class="fas fa-file-alt me-1"></i>
+                <strong>Sources:</strong> ${sources.join(', ')}
+            </div>
+        `;
+    }
+    
+    messageDiv.innerHTML = `
+        <div class="message-header">
+            <i class="fas fa-${type === 'user' ? 'user' : 'robot'} me-2"></i>
+            ${type === 'user' ? 'You' : 'AI Assistant'}
+        </div>
+        <div class="message-content">${content}</div>
+        ${sourcesHtml}
+    `;
+    
+    chatContainer.appendChild(messageDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function showTypingIndicator() {
+    document.getElementById('typingIndicator').style.display = 'block';
+    const chatContainer = document.getElementById('chatContainer');
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function hideTypingIndicator() {
+    document.getElementById('typingIndicator').style.display = 'none';
+}
+
+function clearChat() {
+    const chatContainer = document.getElementById('chatContainer');
+    const messages = chatContainer.querySelectorAll('.message');
+    messages.forEach(msg => msg.remove());
+    
+    // Reset chat count
+    chatCount = 0;
+    document.getElementById('chatCount').textContent = chatCount;
+    
+    // Show welcome message again
+    const welcomeMsg = document.getElementById('welcomeMessage');
+    if (welcomeMsg) {
+        welcomeMsg.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

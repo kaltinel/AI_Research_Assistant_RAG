@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Documents - LLM-Embed RAG System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-area {
+        border: 3px dashed #e9ecef;
+        border-radius: 15px;
+        padding: 60px 40px;
+        text-align: center;
+        background: #fafafa;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        margin-bottom: 30px;
+    }
+
+    .upload-area:hover, .upload-area.dragover {
+        border-color: var(--secondary-color);
+        background: rgba(52, 152, 219, 0.05);
+    }
+
+    .upload-area.uploading {
+        pointer-events: none;
+        opacity: 0.7;
+    }
+
+    .upload-icon {
+        font-size: 3rem;
+        color: var(--secondary-color);
+        margin-bottom: 20px;
+    }
+
+    .upload-text {
+        font-size: 1.2rem;
+        color: #6c757d;
+        margin-bottom: 10px;
+    }
+
+    .upload-subtext {
+        font-size: 0.9rem;
+        color: #adb5bd;
+    }
+
+    .file-input {
+        display: none;
+    }
+
+    .progress-container {
+        display: none;
+        margin-top: 20px;
+    }
+
+    .upload-queue {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .upload-item {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 15px;
+        transition: all 0.3s ease;
+    }
+
+    .upload-item:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .upload-status {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+    }
+
+    .status-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+    }
+
+    .status-uploading {
+        background: #ffc107;
+        color: white;
+        animation: pulse 2s infinite;
+    }
+
+    .status-processing {
+        background: #17a2b8;
+        color: white;
+        animation: pulse 2s infinite;
+    }
+
+    .status-completed {
+        background: #28a745;
+        color: white;
+    }
+
+    .status-error {
+        background: #dc3545;
+        color: white;
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+
+    .guidelines {
+        background: #e3f2fd;
+        border: 1px solid #bbdefb;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+
+    .guideline-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .guideline-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .guideline-icon {
+        color: var(--secondary-color);
+        margin-right: 10px;
+        width: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <!-- Upload Area -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-upload me-2"></i>Upload PDF Documents
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="uploadArea" class="upload-area" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <div class="upload-text">Drop PDF files here or click to browse</div>
+                    <div class="upload-subtext">Maximum file size: 100MB</div>
+                </div>
+                
+                <input type="file" id="fileInput" class="file-input" accept=".pdf" multiple>
+                
+                <div id="progressContainer" class="progress-container">
+                    <div class="progress" style="height: 8px;">
+                        <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="text-center mt-2">
+                        <small id="progressText">Uploading...</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Upload Queue -->
+        <div id="uploadQueue" class="card mt-4" style="display: none;">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Upload Queue
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="uploadList" class="upload-queue"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Upload Guidelines -->
+        <div class="guidelines">
+            <h6 class="mb-3">
+                <i class="fas fa-info-circle me-2"></i>Upload Guidelines
+            </h6>
+            
+            <div class="guideline-item">
+                <i class="fas fa-file-pdf guideline-icon"></i>
+                <span>Only PDF files are supported</span>
+            </div>
+            
+            <div class="guideline-item">
+                <i class="fas fa-weight-hanging guideline-icon"></i>
+                <span>Maximum file size: 100MB</span>
+            </div>
+            
+            <div class="guideline-item">
+                <i class="fas fa-file-alt guideline-icon"></i>
+                <span>Maximum 1,000 pages per document</span>
+            </div>
+            
+            <div class="guideline-item">
+                <i class="fas fa-search guideline-icon"></i>
+                <span>Text-based PDFs work best</span>
+            </div>
+            
+            <div class="guideline-item">
+                <i class="fas fa-clock guideline-icon"></i>
+                <span>Processing may take several minutes</span>
+            </div>
+            
+            <div class="guideline-item">
+                <i class="fas fa-shield-alt guideline-icon"></i>
+                <span>Files are processed locally and securely</span>
+            </div>
+        </div>
+        
+        <!-- Processing Status -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-cogs me-2"></i>Processing Steps
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="small text-muted">
+                    <div class="mb-2">
+                        <strong>1. Upload:</strong> File is uploaded to server
+                    </div>
+                    <div class="mb-2">
+                        <strong>2. Extract:</strong> Text content is extracted from PDF
+                    </div>
+                    <div class="mb-2">
+                        <strong>3. Chunk:</strong> Large documents are split into sections
+                    </div>
+                    <div class="mb-2">
+                        <strong>4. Embed:</strong> Text is converted to vector embeddings
+                    </div>
+                    <div>
+                        <strong>5. Store:</strong> Embeddings are saved to database
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-bolt me-2"></i>Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('index') }}" class="btn btn-primary w-100 mb-2">
+                    <i class="fas fa-comments me-2"></i>Go to Chat
+                </a>
+                <button class="btn btn-outline-secondary w-100" onclick="clearQueue()">
+                    <i class="fas fa-trash me-2"></i>Clear Queue
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let uploadQueue = [];
+
+// File input change handler
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    handleFiles(e.target.files);
+});
+
+// Drag and drop handlers
+const uploadArea = document.getElementById('uploadArea');
+
+uploadArea.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+});
+
+uploadArea.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+});
+
+uploadArea.addEventListener('drop', function(e) {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    
+    const files = Array.from(e.dataTransfer.files).filter(file => file.type === 'application/pdf');
+    if (files.length > 0) {
+        handleFiles(files);
+    } else {
+        alert('Please upload only PDF files.');
+    }
+});
+
+function handleFiles(files) {
+    const fileArray = Array.from(files);
+    
+    // Validate files
+    for (let file of fileArray) {
+        if (file.type !== 'application/pdf') {
+            alert(`"${file.name}" is not a PDF file. Only PDF files are allowed.`);
+            continue;
+        }
+        
+        if (file.size > 100 * 1024 * 1024) { // 100MB
+            alert(`"${file.name}" is too large. Maximum file size is 100MB.`);
+            continue;
+        }
+        
+        // Add to queue
+        const uploadItem = {
+            id: Date.now() + Math.random(),
+            file: file,
+            status: 'queued',
+            message: 'Waiting to upload...'
+        };
+        
+        uploadQueue.push(uploadItem);
+        addUploadItem(uploadItem);
+    }
+    
+    // Show queue if not visible
+    if (uploadQueue.length > 0) {
+        document.getElementById('uploadQueue').style.display = 'block';
+    }
+    
+    // Start processing queue
+    processQueue();
+}
+
+function addUploadItem(item) {
+    const uploadList = document.getElementById('uploadList');
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'upload-item';
+    itemDiv.id = `upload-${item.id}`;
+    
+    itemDiv.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1">
+                <h6 class="mb-1">${item.file.name}</h6>
+                <small class="text-muted">${formatFileSize(item.file.size)}</small>
+            </div>
+            <div class="status-icon status-uploading">
+                <i class="fas fa-clock"></i>
+            </div>
+        </div>
+        <div class="upload-status">
+            <span class="status-text">${item.message}</span>
+        </div>
+    `;
+    
+    uploadList.appendChild(itemDiv);
+}
+
+function updateUploadItem(itemId, status, message, progress = null) {
+    const itemDiv = document.getElementById(`upload-${itemId}`);
+    if (!itemDiv) return;
+    
+    const statusIcon = itemDiv.querySelector('.status-icon');
+    const statusText = itemDiv.querySelector('.status-text');
+    
+    // Update status text
+    statusText.textContent = message;
+    
+    // Update status icon
+    statusIcon.className = 'status-icon';
+    switch (status) {
+        case 'uploading':
+            statusIcon.classList.add('status-uploading');
+            statusIcon.innerHTML = '<i class="fas fa-upload"></i>';
+            break;
+        case 'processing':
+            statusIcon.classList.add('status-processing');
+            statusIcon.innerHTML = '<i class="fas fa-cog fa-spin"></i>';
+            break;
+        case 'completed':
+            statusIcon.classList.add('status-completed');
+            statusIcon.innerHTML = '<i class="fas fa-check"></i>';
+            break;
+        case 'error':
+            statusIcon.classList.add('status-error');
+            statusIcon.innerHTML = '<i class="fas fa-times"></i>';
+            break;
+    }
+}
+
+async function processQueue() {
+    for (let item of uploadQueue) {
+        if (item.status !== 'queued') continue;
+        
+        item.status = 'uploading';
+        updateUploadItem(item.id, 'uploading', 'Uploading file...');
+        
+        try {
+            // Upload file
+            const formData = new FormData();
+            formData.append('file', item.file);
+            
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                item.status = 'processing';
+                item.uploadId = data.upload_id;
+                updateUploadItem(item.id, 'processing', 'Processing document...');
+                
+                // Monitor processing status
+                monitorProcessing(item);
+            } else {
+                item.status = 'error';
+                updateUploadItem(item.id, 'error', data.error || 'Upload failed');
+            }
+            
+        } catch (error) {
+            item.status = 'error';
+            updateUploadItem(item.id, 'error', 'Upload failed: ' + error.message);
+        }
+    }
+}
+
+async function monitorProcessing(item) {
+    const checkStatus = async () => {
+        try {
+            const response = await fetch(`/api/upload_status/${item.uploadId}`);
+            const data = await response.json();
+            
+            if (data.status === 'completed') {
+                item.status = 'completed';
+                updateUploadItem(item.id, 'completed', 'Document ready for queries!');
+                return;
+            } else if (data.status === 'error') {
+                item.status = 'error';
+                updateUploadItem(item.id, 'error', data.message || 'Processing failed');
+                return;
+            } else {
+                updateUploadItem(item.id, 'processing', data.message || 'Processing...');
+                // Check again in 2 seconds
+                setTimeout(checkStatus, 2000);
+            }
+            
+        } catch (error) {
+            item.status = 'error';
+            updateUploadItem(item.id, 'error', 'Status check failed');
+        }
+    };
+    
+    checkStatus();
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function clearQueue() {
+    uploadQueue = [];
+    document.getElementById('uploadList').innerHTML = '';
+    document.getElementById('uploadQueue').style.display = 'none';
+}
+</script>
+{% endblock %}
